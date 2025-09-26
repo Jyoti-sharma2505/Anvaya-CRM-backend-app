@@ -179,7 +179,7 @@ app.post("/leads/:id/comments",async(req,res)=>{
 //get routes for comments//////
 async function getCommnetsByLead(leadId){
     try{
-     const comments=await Comment.find({ lead: leadId });
+     const comments=await Comment.find({ lead: leadId }).populate("author", "name _id");
      console.log(comments)
      return comments;
     }catch(error){
