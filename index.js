@@ -33,6 +33,28 @@ app.post("/agents",async(req,res)=>{
     }
 })
 
+// get routes for sales agents//////
+async function getAllSalesAgents(){
+    try{
+    const agents=await SalesAgent.find();
+    return agents;
+    }catch(error){
+        throw error;
+    }
+}
+app.get("/agents",async(req,res)=>{
+    try{
+   const agents= await getAllSalesAgents();
+   if(agents){
+    res.status(200).json({agents:agents})
+   }else{
+    res.status(404).json({error:"Agents not found"})
+   }
+    }catch(error){
+        res.status(500).json({error:"Not able to fetch agents"})
+    }
+})
+
 //post routes for leads //////
 async function createLead(addLead){
     try{
