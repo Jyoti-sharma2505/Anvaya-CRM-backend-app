@@ -81,16 +81,25 @@ app.post("/leads",async(req,res)=>{
 
 
 ///updare lead status/////
-async function updateLeadStatus(LeadId,leadData){
-    try{
-    const updatedLead=await LeadSchema.findByIdAndUpdate(LeadId,  { ...leadData }, // पूरा object update होगा
-      { new: true, runValidators: true } // runValidators=true ताकि schema validations लागू हों
-    ).populate("salesAgent", "name");
-    return updatedLead
-    }catch(error){
-        throw error;
+async function updateLeadStatus(LeadId, leadData) {
+  try {
+    // Agar status Closed hai aur closedAt nahi bheja gaya
+    if (leadData.status === "Closed" && !leadData.closedAt) {
+      leadData.closedAt = new Date(); // ✅ Ab closedAt save hoga
     }
+
+    const updatedLead = await LeadSchema.findByIdAndUpdate(
+      LeadId,
+      { ...leadData },
+      { new: true, runValidators: true }
+    ).populate("salesAgent", "name");
+
+    return updatedLead;
+  } catch (error) {
+    throw error;
+  }
 }
+
 app.post("/leads/:id",async(req,res)=>{
     try{
     const Lead=await updateLeadStatus(req.params.id,req.body);
@@ -199,65 +208,78 @@ app.get("/leads/:id/comments",async(req,res)=>{
     }
 })
 
-////Reporting API /////
-async function leadReport(){
-    try{
-    const today=new Data();
-    const lastWeek=new date();
-    lastWeeek.setDate(today.getDate()-7);
-    const leadsClosedLastWeek=await LeadSchema.find({
-        status:"Closed",
-        closedAt:{ $gte:lastWeek,$lte:today}
-    }).populate("saleAgent","id name").select("name saleAgent closedAt");
-    return leadsClosedLastWeek.map((lead)=>({
-       id:lead._id,
-       name:lead.name,
-       salesAgent:lead.salesAgent.name,
-      closedAt:lead.closedAt
-    }))
-    }catch(error){
-        throw error;
-    }
-}
-app.get("/report/last-week",async(req,res)=>{
-    try{
-  const report = await leadReport();
-  if(report.length>0){
-    res.status(200).json({report:report})
-  }else{
-    res.status(404).json({error:"No leads closed in the last week"})
+//// Reporting API /////
+
+// Last week closed leads
+// Last week closed leads report
+async function leadReport() {
+  try {
+    const today = new Date();
+    const lastWeek = new Date();
+    lastWeek.setDate(today.getDate() - 7);
+
+    const leadsClosedLastWeek = await LeadSchema.find({
+      status: "Closed",
+      closedAt: { $gte: lastWeek, $lte: today },
+    })
+      .populate("salesAgent", "_id name")
+      .select("name salesAgent closedAt");
+
+    return leadsClosedLastWeek.map((lead) => ({
+      id: lead._id,
+      name: lead.name,
+      salesAgent: lead.salesAgent ? lead.salesAgent.name : "N/A",
+      closedAt: lead.closedAt,
+    }));
+  } catch (error) {
+    throw error;
   }
-    }catch(error){
-        res.status(500).json({error:"Not able to fetch data"})
-    }
-})
-//pipeline for report //////
-async function leadReportPipeline(){
-    try{
-    const count = await LeadSchema.countDocuments({status:"closed"});
-    return count;
-    }catch(error){
-        throw error;
-    }
 }
-app.get("/report/pipeline",async(req,res)=>{
-    try{
-   const pipeline=await leadReportPipeline();
-   if(pipeline){
-    res.status(200).json({message:"Pipeline fetched successfully",pipeline:pipeline})
-   }else{
-    res.status(404).json({error:"No leads in pipeline"})
-   }
-    }catch(error){
-        res.status(500).json({error:"Not able to fetch data"})
+
+// Pipeline report (Closed vs Not Closed)
+async function leadReportPipeline() {
+  try {
+    const closed = await LeadSchema.countDocuments({ status: "Closed" });
+    const pipeline = await LeadSchema.countDocuments({ status: { $ne: "Closed" } });
+    return { closed, pipeline };
+  } catch (error) {
+    throw error;
+  }
+}
+
+// Last week closed leads
+app.get("/report/last-week", async (req, res) => {
+  try {
+    const report = await leadReport();
+    if (report.length > 0) {
+      res.status(200).json({ report });
+    } else {
+      res.status(404).json({ error: "No leads closed in the last week" });
     }
-})
+  } catch (error) {
+    res.status(500).json({ error: "Not able to fetch data" });
+  }
+});
+
+// Pipeline Report
+app.get("/report/pipeline", async (req, res) => {
+  try {
+    const pipeline = await leadReportPipeline();
+    res.status(200).json({
+      message: "Pipeline fetched successfully",
+      pipeline,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Not able to fetch data" });
+  }
+});
+
 
 app.get("/",(req,res)=>{
     res.send("Welcome to CRM backend");
 })
 
-const PORT=process.env.PORT || 3000;
+const PORT=process.env.PORT || 5000;
 app.listen(PORT,()=>{
     console.log(`Server is running on port ${PORT}`)
 })
